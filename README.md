@@ -18,9 +18,41 @@ Durante el análisis de los datos se determinará y justificará la frecuencia d
 
 **Individual Household Electric Power Consumption**
 
-El dataset contiene mediciones de consumo eléctrico residencial registradas a lo largo del tiempo.
+El proyecto utiliza el dataset Individual Household Electric Power Consumption, publicado en el UCI Machine Learning Repository.
 
-Los datos crudos no serán versionados directamente en Git. El proyecto contará con un proceso reproducible de ingesta para obtenerlos.
+El conjunto de datos contiene 2,075,259 registros de mediciones de consumo eléctrico residencial.
+
+Los datos son obtenidos mediante un proceso de ingesta reproducible desde la fuente oficial y almacenados localmente en `data/raw/`.
+
+Los archivos de datos crudos no son versionados en Git debido a su tamaño y se encuentran excluidos mediante `.gitignore`.
+
+## Data Ingestion
+
+La ingesta de datos se encuentra implementada en:
+
+```text
+src/ingestion/ingest.py
+```
+
+El proceso realiza automáticamente:
+
+- descarga del dataset desde UCI Machine Learning Repository;
+- extracción del archivo original;
+- almacenamiento del dataset en `data/raw/`;
+- validación básica de existencia y tamaño;
+- conteo de registros;
+- cálculo del hash SHA-256;
+- generación de metadata de la ingesta.
+
+Para ejecutar la ingesta desde la raíz del proyecto:
+
+```powershell
+python src/ingestion/ingest.py
+```
+
+La metadata generada registra la fuente, fecha de ingesta en UTC, cantidad de registros, tamaño del archivo y hash SHA-256.
+
+Si el dataset ya se encuentra disponible en `data/raw/`, el proceso evita descargarlo nuevamente.
 
 ## Arquitectura MLOps
 
@@ -162,7 +194,7 @@ Cada integrante realizará cambios mediante ramas y commits descriptivos para ma
 - [x] Entorno virtual creado
 - [x] Dependencias iniciales definidas
 - [x] Estructura inicial del proyecto creada
-- [ ] Data Ingestion
+- [x] Data Ingestion
 - [ ] Data Validation
 - [ ] Data Cleaning
 - [ ] Feature Pipeline

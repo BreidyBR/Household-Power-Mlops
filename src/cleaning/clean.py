@@ -26,12 +26,14 @@ NUMERIC_COLUMNS = [
 ]
 
 # Duración máxima (en minutos) de una racha de valores faltantes que se
-# considera segura para interpolar linealmente. Justificado en
-# notebooks/01_data_quality_cleaning.ipynb (Parte II, sección 3): el 87% de
-# las rachas duran <= 60 minutos pero solo representan el 1.1% del volumen
-# de datos faltantes; el 98.9% restante proviene de 9 rachas largas (hasta
-# ~5 días) que no deben interpolarse linealmente porque fabricarían una
-# tendencia artificial.
+# considera aceptable para interpolación temporal dentro de este pipeline.
+# El umbral se definió a partir del análisis documentado en
+# notebooks/01_data_quality_cleaning.ipynb (Parte II, sección 3).
+#
+# Las rachas de hasta 60 minutos representan una fracción muy pequeña del
+# volumen total de datos faltantes, por lo que se adopta este umbral como una
+# estrategia conservadora. Las rachas más largas se mantienen como NaN para
+# evitar reconstruir períodos prolongados sin observaciones reales.
 GAP_LIMIT_MINUTES = 60
 
 

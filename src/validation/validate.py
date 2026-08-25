@@ -121,12 +121,14 @@ MAX_MISSING_FRACTION = 0.05  # 5%
 # exactamente de 1 minuto). Esta es la frecuencia que se espera siempre.
 EXPECTED_SAMPLING_FREQUENCY = "1min"
 
-# Duración máxima (en minutos) de un hueco temporal que se considera normal.
-# Se usa el mismo valor (60 minutos) que GAP_LIMIT_MINUTES en
-# src/cleaning/clean.py, porque ambos scripts razonan sobre el mismo
-# fenómeno: el notebook (Parte II, sección 3) mostró que el 87% de las
-# rachas de datos faltantes duran <= 60 minutos, mientras que las rachas
-# más largas (hasta ~5 días) son atípicas y merecen atención.
+# Duración máxima (en minutos) de un hueco entre timestamps que se considera
+# tolerable antes de generar una alerta. Este control es independiente de las
+# rachas de valores faltantes en las variables eléctricas: aquí se evalúa la
+# continuidad de la secuencia temporal, no la presencia de NaN en las mediciones.
+# El diagnóstico del dataset mostró que la frecuencia esperada es de un minuto
+# y que no existen intervalos temporales irregulares. Se establece un umbral
+# conservador de 60 minutos para detectar futuras interrupciones prolongadas
+# en la secuencia de timestamps.
 MAX_ALLOWED_GAP_MINUTES = 60
 
 # Fracción de intervalos entre timestamps que pueden exceder
@@ -207,13 +209,14 @@ def rule_required_columns(df):
     """
     Regla 1: columnas obligatorias presentes.
 
-    Verifica que el archivo tenga exactamente las columnas que el resto del
-    pipeline espera (las 7 variables eléctricas + Date + Time). Esta es la
-    primera línea de defensa contra un cambio de esquema en la fuente de
-    datos (por ejemplo, si UCI actualizara el archivo y renombrara o
-    eliminara una columna): sin esta regla, el error aparecería más
-    adelante y de forma menos clara, en pleno proceso de limpieza o
-    entrenamiento.
+    Verifica que el archivo contenga todas las columnas que el resto del
+    pipeline necesita (las 7 variables eléctricas + Date + Time).
+
+    Esta regla protege contra cambios de esquema en la fuente de datos, por
+    ejemplo, si una columna obligatoria fuera eliminada o renombrada.
+
+    La presencia de columnas adicionales no provoca un FAIL, siempre que todas
+    las columnas requeridas continúen disponibles.
     """
 
     missing_cols = [c for c in REQUIRED_COLUMNS if c not in df.columns]
@@ -233,7 +236,7 @@ def rule_min_rows(df):
     """
 
     n = len(df)
-    status = PASS if n > MIN_ROWS_ALLOWED else FAIL
+    status = PASS if n >= MIN_ROWS_ALLOWED else FAIL
     return GateResult("min_rows", status, f"{n} filas (mínimo requerido: {MIN_ROWS_ALLOWED})")
 
 

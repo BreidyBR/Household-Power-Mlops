@@ -1,0 +1,45 @@
+{
+  "overall_status": "PASS",
+  "rules": [
+    {
+      "rule": "required_columns_present",
+      "status": "PASS",
+      "detail": "Todas las columnas obligatorias están presentes"
+    },
+    {
+      "rule": "min_rows",
+      "status": "PASS",
+      "detail": "2075259 filas (mínimo requerido: 1000)"
+    },
+    {
+      "rule": "valid_timestamps",
+      "status": "PASS",
+      "detail": "0 timestamps inválidos (0.0000%)"
+    },
+    {
+      "rule": "duplicated_below_threshold",
+      "status": "PASS",
+      "detail": "0.0000% de filas duplicadas (máx: 1%)"
+    },
+    {
+      "rule": "missing_below_threshold",
+      "status": "PASS",
+      "detail": "1.2518% missing promedio en columnas numéricas (máx: 5%)"
+    },
+    {
+      "rule": "target_non_negative",
+      "status": "PASS",
+      "detail": "0 valores negativos en Global_active_power (físicamente imposible)"
+    },
+    {
+      "rule": "expected_sampling_frequency",
+      "status": "PASS",
+      "detail": "moda de intervalos=0 days 00:01:00, esperado=0 days 00:01:00, 0.0000% de intervalos fuera de frecuencia"
+    },
+    {
+      "rule": "temporal_gaps_controlled",
+      "status": "PASS",
+      "detail": "0 huecos > 60min (0.0000% de los intervalos), hueco máximo=0 days 00:00:00"
+    }
+  ]
+}

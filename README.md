@@ -279,6 +279,37 @@ Finalmente, `Global_intensity` presenta una correlación prácticamente perfecta
 
 Los resultados del EDA proporcionan la evidencia necesaria para la siguiente etapa del proyecto, donde se definirán las características temporales, rezagos, estadísticas móviles, horizonte de predicción y estrategia definitiva de preparación de la serie, evitando el uso de información futura.
 
+## Feature Engineering
+
+La construcción del dataset supervisado se investiga y justifica en:
+
+```text
+notebooks/03_feature_engineering.ipynb
+```
+
+y se traslada a un pipeline reproducible en:
+
+```text
+src/features/build_features.py
+```
+
+Partiendo del dataset limpio (`data/interim/household_power_cleaned.parquet`), el proceso define:
+
+- **Frecuencia horaria**, decisión que el EDA había dejado pendiente: conserva el patrón intradía identificado y coincide con las unidades ya definidas para lags y rolling windows;
+- **Imputación estacional en cascada** (168h → 24h → interpolación) para las 421 horas sin dato tras el resampling, aplicada *antes* de construir lags/rolling: sin esta imputación, el missing se propagaría de 1.22 % a 5.10 % de las filas, porque el lag más largo (168h) arrastra cualquier hora faltante hasta 168 filas hacia adelante;
+- **Variable objetivo** `Global_active_power` con **horizonte de 24 horas**, alineado con el ciclo diario dominante encontrado en el EDA;
+- **Features de calendario**: `hour`, `day_of_week`, `month`, `is_weekend`, `hour_sin`, `hour_cos`;
+- **Lags**: 1, 2, 3, 24, 48 y 168 horas, cada uno correspondiente a un pico real de autocorrelación observado en el EDA;
+- **Rolling mean/std**: ventanas de 3, 6, 24 y 168 horas, calculadas sobre la serie desplazada un paso (`shift(1)`) para no incluir el valor del instante actual;
+- **Verificación explícita de ausencia de leakage**: se confirma que cada lag corresponde exactamente a su desplazamiento temporal, que el target efectivamente mira 24 horas hacia adelante, y que ninguna feature coincide sospechosamente con el valor contemporáneo de la serie.
+
+Para ejecutar la etapa de Feature Engineering desde la raíz del proyecto:
+
+```powershell
+python src/features/build_features.py
+```
+
+El resultado se guarda en `data/processed/features_hourly.parquet`: 34,397 filas × 20 features + `target`. Solo se eliminan las filas sin historia suficiente al inicio (168 horas) y sin dato real de `target` al final (24 horas) — ninguna fila se pierde por el missing tratado en la imputación.
 
 ## Estado del proyecto
 
@@ -294,7 +325,7 @@ Los resultados del EDA proporcionan la evidencia necesaria para la siguiente eta
 - [x] Data Validation
 - [x] Data Cleaning
 - [x] EDA temporal
-- [ ] Feature Pipeline
+- [x] Feature Pipeline
 - [ ] Training
 - [ ] Evaluation
 - [ ] MLflow Tracking

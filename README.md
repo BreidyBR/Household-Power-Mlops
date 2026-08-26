@@ -245,6 +245,41 @@ python src/cleaning/clean.py
 
 El resultado se guarda en `data/interim/household_power_cleaned.parquet`, preservando las 2,075,259 filas originales.
 
+## EDA temporal
+
+El análisis exploratorio de la serie temporal se encuentra documentado en:
+
+```text
+notebooks/02_eda.ipynb
+```
+
+El EDA se realiza sobre el dataset limpio generado por el pipeline de Data Cleaning y tiene como objetivo comprender la estructura temporal del consumo eléctrico antes de definir la estrategia de Feature Engineering y modelado.
+
+Durante el análisis se estudiaron:
+
+- estadísticos descriptivos y distribución de las variables eléctricas;
+- evolución temporal de `Global_active_power`;
+- patrones de consumo por hora del día, día de la semana y mes;
+- tendencia mediante medias móviles;
+- estacionalidad mediante descomposición de la serie;
+- autocorrelación horaria;
+- valores extremos y su distribución temporal;
+- gaps temporales y duración de los períodos sin información;
+- relaciones entre las variables eléctricas.
+
+Los resultados muestran patrones temporales claros. El consumo presenta variaciones según la hora del día, con mayor actividad durante la mañana y especialmente durante la tarde-noche. También se observan diferencias semanales, con mayores niveles promedio durante el fin de semana, y un patrón anual caracterizado por mayor consumo alrededor del inicio y final del año.
+
+La autocorrelación evidencia dependencia entre observaciones consecutivas y ciclos asociados aproximadamente con períodos de 24 horas y sus múltiplos. Estos resultados justifican evaluar posteriormente características temporales y rezagos durante Feature Engineering.
+
+El análisis mediante IQR identificó 94,925 observaciones extremas en `Global_active_power` (4.63 % de las observaciones válidas). Estos valores no se eliminan automáticamente, ya que su concentración en períodos habituales de mayor consumo sugiere que una parte importante corresponde a comportamiento real y no necesariamente a errores.
+
+Después del resampling horario se identificaron 421 horas completamente sin información agrupadas en 8 gaps. La mayoría corresponde a interrupciones prolongadas y el gap máximo alcanza 119 horas. Por esta razón, estos períodos no se imputan de forma general durante el EDA.
+
+Finalmente, `Global_intensity` presenta una correlación prácticamente perfecta con `Global_active_power` (~0.999), mientras que los submedidores aportan relaciones de distinta magnitud. Esta posible redundancia deberá evaluarse durante la selección de características.
+
+Los resultados del EDA proporcionan la evidencia necesaria para la siguiente etapa del proyecto, donde se definirán las características temporales, rezagos, estadísticas móviles, horizonte de predicción y estrategia definitiva de preparación de la serie, evitando el uso de información futura.
+
+
 ## Estado del proyecto
 
 - [x] Repositorio Git creado
@@ -258,6 +293,7 @@ El resultado se guarda en `data/interim/household_power_cleaned.parquet`, preser
 - [x] Data Ingestion
 - [x] Data Validation
 - [x] Data Cleaning
+- [x] EDA temporal
 - [ ] Feature Pipeline
 - [ ] Training
 - [ ] Evaluation

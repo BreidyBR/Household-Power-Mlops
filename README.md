@@ -110,6 +110,7 @@ Household-Power-Mlops/
 │   ├── interim/
 │   ├── processed/
 │   └── production/
+|── models/
 ├── notebooks/
 ├── reports/
 │   ├── figures/
@@ -296,7 +297,7 @@ src/features/build_features.py
 Partiendo del dataset limpio (`data/interim/household_power_cleaned.parquet`), el proceso define:
 
 - **Frecuencia horaria**, decisión que el EDA había dejado pendiente: conserva el patrón intradía identificado y coincide con las unidades ya definidas para lags y rolling windows;
-- **Imputación estacional en cascada** (168h → 24h → interpolación) para las 421 horas sin dato tras el resampling, aplicada *antes* de construir lags/rolling: sin esta imputación, el missing se propagaría de 1.22 % a 5.10 % de las filas, porque el lag más largo (168h) arrastra cualquier hora faltante hasta 168 filas hacia adelante;
+- **Imputación estacional causal en cascada** (168h → 24h), utilizando exclusivamente información pasada. Las horas faltantes se intentan completar primero con el valor observado 168 horas antes y, si este no está disponible, con el valor de 24 horas antes. Si el valor continúa ausente, se conserva como `NaN` y la fila se excluye posteriormente si afecta una feature necesaria. En este dataset, las 421 horas faltantes fueron resueltas utilizando el valor de 168 horas antes, por lo que el respaldo de 24 horas no fue necesario;
 - **Variable objetivo** `Global_active_power` con **horizonte de 24 horas**, alineado con el ciclo diario dominante encontrado en el EDA;
 - **Features de calendario**: `hour`, `day_of_week`, `month`, `is_weekend`, `hour_sin`, `hour_cos`;
 - **Lags**: 1, 2, 3, 24, 48 y 168 horas, cada uno correspondiente a un pico real de autocorrelación observado en el EDA;
@@ -309,7 +310,63 @@ Para ejecutar la etapa de Feature Engineering desde la raíz del proyecto:
 python src/features/build_features.py
 ```
 
-El resultado se guarda en `data/processed/features_hourly.parquet`: 34,397 filas × 20 features + `target`. Solo se eliminan las filas sin historia suficiente al inicio (168 horas) y sin dato real de `target` al final (24 horas) — ninguna fila se pierde por el missing tratado en la imputación.
+El resultado se guarda en `data/processed/features_hourly.parquet`: 33,976 filas × 20 features + `target` (21 columnas en total). Se eliminan 613 filas: 168 filas iniciales sin historia suficiente para construir las features de 168 horas, 24 filas finales sin horizonte disponible a t+24h y 421 filas cuyo target corresponde a una observación originalmente faltante. De esta manera, las features pueden aprovechar la imputación causal basada en información pasada, pero el modelo se entrenará únicamente con targets correspondientes a observaciones reales.
+
+## Training y Evaluation
+
+La etapa de experimentación, comparación y selección de modelos se encuentra documentada en:
+
+```text
+notebooks/04_training.ipynb
+```
+
+El entrenamiento parte del dataset supervisado generado durante Feature Engineering. Los datos se dividen respetando estrictamente el orden temporal, sin utilizar `shuffle`, en conjuntos de entrenamiento, validación y test.
+
+Como punto de referencia se utiliza un baseline estacional basado en el consumo observado 24 horas antes. Posteriormente se evalúan diferentes algoritmos de Machine Learning:
+
+- Regresión Lineal;
+- Random Forest;
+- Gradient Boosting;
+- HistGradientBoosting.
+
+Durante la experimentación se identificó sobreajuste en la configuración inicial de Random Forest. Por esta razón, se evaluó una versión regularizada mediante restricciones en la profundidad de los árboles y en el número mínimo de observaciones requeridas para divisiones y hojas.
+
+Los modelos candidatos finales se evaluaron mediante `TimeSeriesSplit` con cinco particiones temporales, permitiendo comprobar su comportamiento en diferentes períodos sin alterar el orden cronológico de la serie.
+
+Random Forest regularizado presentó el mejor desempeño promedio durante esta validación temporal:
+
+- MAE promedio: **0.5227 kW**;
+- RMSE promedio: **0.7106 kW**.
+
+Después de seleccionar el modelo, Random Forest regularizado se reentrenó utilizando conjuntamente los conjuntos de entrenamiento y validación. El conjunto de test permaneció separado durante todo el proceso de selección y se utilizó únicamente para realizar la evaluación final.
+
+El modelo final obtuvo aproximadamente:
+
+- MAE: **0.43 kW**;
+- RMSE: **0.59 kW**;
+- sMAPE: **46.53 %**.
+
+En comparación con el baseline estacional, el modelo final reduce considerablemente el error de predicción. El análisis de los resultados muestra que Random Forest logra representar adecuadamente el comportamiento general del consumo eléctrico, aunque presenta mayor dificultad para reproducir algunos picos elevados y cambios bruscos.
+
+La lógica necesaria para reproducir el entrenamiento final se encuentra implementada en:
+
+```text
+src/training/train.py
+```
+
+Para ejecutar el entrenamiento desde la raíz del proyecto:
+
+```powershell
+python src/training/train.py
+```
+
+El script carga `data/processed/features_hourly.parquet`, realiza la separación temporal, reentrena el Random Forest regularizado utilizando los datos de entrenamiento y validación, calcula las métricas finales sobre el conjunto de test y guarda el modelo entrenado en:
+
+```text
+models/random_forest_model.joblib
+```
+
+De esta manera, el entrenamiento final puede reproducirse independientemente del notebook utilizado durante la experimentación.
 
 ## Estado del proyecto
 
@@ -326,8 +383,8 @@ El resultado se guarda en `data/processed/features_hourly.parquet`: 34,397 filas
 - [x] Data Cleaning
 - [x] EDA temporal
 - [x] Feature Pipeline
-- [ ] Training
-- [ ] Evaluation
+- [x] Training
+- [x] Evaluation
 - [ ] MLflow Tracking
 - [ ] Model Registry
 - [ ] Docker

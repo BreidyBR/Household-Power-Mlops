@@ -34,11 +34,7 @@ LAGS_HOURS = [1, 2, 3, 24, 48, 168]
 # Ventanas (en horas) para rolling mean/std. Mismo criterio que los lags.
 ROLLING_WINDOWS_HOURS = [3, 6, 24, 168]
 
-# Duración máxima (en minutos) de una racha de valores faltantes que se
-# considera segura para interpolar linealmente, como último recurso de la
-# imputación en cascada (ver build_hourly_series). Mismo valor que
-# GAP_LIMIT_MINUTES en src/cleaning/clean.py.
-GAP_LIMIT_MINUTES = 60
+
 
 
 def load_interim():
@@ -69,8 +65,7 @@ def build_hourly_series(df_interim):
 
         1. valor de 168h antes (mismo día/hora de la semana anterior)
         2. si también falta, valor de 24h antes (mismo momento del día anterior)
-        3. si también falta, interpolación temporal (último recurso)
-
+        
     Devuelve también `filled_via_168h`, una máscara booleana de las horas que
     se imputaron con el método (1). La usan los chequeos de leakage para no
     confundir esa coincidencia esperada con una fuga de datos real.
@@ -83,9 +78,9 @@ def build_hourly_series(df_interim):
     filled_via_168h = missing_mask & filled.notna()
 
     filled = filled.fillna(hourly.shift(24))
-    filled = filled.interpolate(method="time")
+    
 
-    return filled, filled_via_168h
+    return hourly, filled, filled_via_168h
 
 
 def add_calendar_features(features, index):
@@ -135,15 +130,22 @@ def add_rolling_features(features, series, windows=ROLLING_WINDOWS_HOURS):
     return features
 
 
-def add_target(features, series, horizon=HORIZON_HOURS):
-    """Agrega la columna target = valor de la serie `horizon` horas después de cada fila."""
+def add_target(features, observed_series, horizon=HORIZON_HOURS):
+    """
+    Agrega el target como el valor observado de la serie `horizon` horas
+    después de cada fila.
+
+    El target se construye a partir de la serie horaria original, antes de
+    imputación, para evitar entrenar el modelo con etiquetas sintéticas.
+    """
 
     features = features.copy()
-    features["target"] = series.shift(-horizon)
+    features["target"] = observed_series.shift(-horizon)
+
     return features
 
 
-def verify_no_leakage(features, series, filled_via_168h, horizon=HORIZON_HOURS, lags=LAGS_HOURS):
+def verify_no_leakage(features, filled_series, observed_series, filled_via_168h, horizon=HORIZON_HOURS, lags=LAGS_HOURS):
     """
     Verificación explícita de que ninguna feature usa información no
     disponible en el momento de la predicción (ver
@@ -155,19 +157,24 @@ def verify_no_leakage(features, series, filled_via_168h, horizon=HORIZON_HOURS, 
     imputación, no una fuga de datos.
     """
 
-    sample_t = features.index[len(features) // 4]
+    valid_target_mask = observed_series.shift(-horizon).notna()
+    valid_times = features.index.intersection(
+        valid_target_mask[valid_target_mask].index
+    )
+
+    sample_t = valid_times[len(valid_times) // 4]
 
     for lag in lags:
-        expected = series.loc[sample_t - pd.Timedelta(hours=lag)]
+        expected = filled_series.loc[sample_t - pd.Timedelta(lag, unit="h")]
         actual = features.loc[sample_t, f"lag_{lag}h"]
         assert np.isclose(actual, expected), f"lag_{lag}h no corresponde a t-{lag}h"
 
-    expected_target = series.loc[sample_t + pd.Timedelta(hours=horizon)]
+    expected_target = observed_series.loc[sample_t + pd.Timedelta(horizon, unit = "h")]
     assert np.isclose(features.loc[sample_t, "target"], expected_target), (
-        "target no corresponde a t+{horizon}h"
+        f"target no corresponde a t+{horizon}h"
     )
 
-    contemporaneous = series.loc[features.index]
+    contemporaneous = filled_series.loc[features.index]
     imputed_via_168h = filled_via_168h.reindex(features.index, fill_value=False)
 
     for col in [c for c in features.columns if c.startswith(("lag_", "rollmean_", "rollstd_"))]:
@@ -181,15 +188,15 @@ def verify_no_leakage(features, series, filled_via_168h, horizon=HORIZON_HOURS, 
 def build_features(df_interim):
     """Pipeline completo: dataset limpio (nivel minuto) -> dataset supervisado listo para entrenar."""
 
-    hourly_filled, filled_via_168h = build_hourly_series(df_interim)
+    hourly_observed, hourly_filled, filled_via_168h = build_hourly_series(df_interim)
 
     features = pd.DataFrame(index=hourly_filled.index)
     features = add_calendar_features(features, features.index)
     features = add_lag_features(features, hourly_filled)
     features = add_rolling_features(features, hourly_filled)
-    features = add_target(features, hourly_filled)
+    features = add_target(features, hourly_observed)
 
-    verify_no_leakage(features, hourly_filled, filled_via_168h)
+    verify_no_leakage(features, hourly_filled, hourly_observed, filled_via_168h)
 
     dataset = features.dropna()
     return dataset

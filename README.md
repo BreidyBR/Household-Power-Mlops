@@ -368,6 +368,52 @@ models/random_forest_model.joblib
 
 De esta manera, el entrenamiento final puede reproducirse independientemente del notebook utilizado durante la experimentación.
 
+## MLflow Tracking y Model Registry
+
+El seguimiento de experimentos y el registro del modelo se implementan en:
+
+```text
+src/training/experiment.py
+src/training/train.py
+```
+
+`experiment.py` no vuelve a decidir qué modelo usar — toma exactamente la misma comparación ya investigada y justificada en `04_training.ipynb` (baseline, Regresión Lineal, Random Forest, Gradient Boosting, Random Forest regularizado, HistGradientBoosting) y la instrumenta con MLflow: cada modelo queda registrado como un run independiente, con:
+
+- **Parameters**: `algorithm`, hiperparámetros, `feature_set`, `random_seed`, `data_version` (hash SHA-256 del dataset usado);
+- **Metrics**: MAE, RMSE, sMAPE;
+- **Artifacts**: el modelo entrenado, un gráfico de residuales y la configuración completa en JSON.
+
+`train.py` (la etapa de entrenamiento final, ya documentada arriba) loggea su propio run sobre el modelo reentrenado con train+validation y evaluado en test, y además **registra el modelo en el Model Registry** de MLflow, representando el ciclo pedido por el proyecto:
+
+```text
+Experiment (6 runs de experiment.py)
+      ↓
+Candidate (run final de train.py, reentrenado con train+validation)
+      ↓
+Validation (ya superada antes de llegar aquí: TimeSeriesSplit de 5 particiones, ver sección Training y Evaluation)
+      ↓
+Production (promoción explícita, tras confirmar el desempeño sobre el test set separado)
+```
+
+El criterio de selección es explícito y reproducible: menor MAE promedio en `TimeSeriesSplit`, confirmado sobre el conjunto de test. Random Forest regularizado es, de forma consistente, el mejor candidato tanto en la comparación de validación como en la validación temporal.
+
+Para ejecutar ambos scripts desde la raíz del proyecto:
+
+```powershell
+python src/training/experiment.py
+python src/training/train.py
+```
+
+Para explorar los resultados en el navegador:
+
+```powershell
+mlflow ui --backend-store-uri sqlite:///mlflow.db --default-artifact-root file:./mlruns
+```
+
+y abrir `http://localhost:5000`. `mlflow.db` y `mlruns/` son artefactos locales regenerables (como `data/raw/` o `models/`) y no se versionan en Git; cada integrante del equipo genera los suyos corriendo los scripts anteriores.
+
+> Nota: al igual que en `src/validation/validate.py` (Día 4), MLflow >= 3.0 puso en modo mantenimiento el backend de tracking de solo archivos. El tracking store usa SQLite (`mlflow.db`) y los artefactos (modelos, gráficos) se mantienen en `mlruns/` local.
+
 ## Estado del proyecto
 
 - [x] Repositorio Git creado
@@ -385,8 +431,8 @@ De esta manera, el entrenamiento final puede reproducirse independientemente del
 - [x] Feature Pipeline
 - [x] Training
 - [x] Evaluation
-- [ ] MLflow Tracking
-- [ ] Model Registry
+- [x] MLflow Tracking
+- [x] Model Registry
 - [ ] Docker
 - [ ] Model API
 - [ ] Monitoring

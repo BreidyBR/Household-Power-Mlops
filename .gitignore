@@ -55,6 +55,8 @@ data/production/*
 # ==============================
 mlruns/
 mlartifacts/
+mlflow.db
+mlflow.db-*
 
 # ==============================
 # Model artifacts

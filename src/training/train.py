@@ -191,6 +191,10 @@ def log_and_register_model(model, metrics, feature_columns, X_test, y_test, y_pr
          transiciona directo a Staging.
        - "Production": promoción final, explícita, tras confirmar el
          desempeño sobre el test set separado (metrics de esta función).
+         Cada reentrenamiento crea una nueva versión (v1, v2, ...) y
+         archiva automáticamente la que estaba antes en Production
+         (`archive_existing_versions=True`), para que siempre haya
+         exactamente una versión vigente, no varias a la vez.
     """
 
     ensure_experiment()
@@ -239,8 +243,15 @@ def log_and_register_model(model, metrics, feature_columns, X_test, y_test, y_pr
         client.transition_model_version_stage(
             name=REGISTERED_MODEL_NAME, version=mv.version, stage="Staging",
         )
+        # archive_existing_versions=True: al promover esta versión a
+        # Production, cualquier otra versión que estuviera en Production
+        # se mueve automáticamente a Archived. Sin esto, cada reentrenamiento
+        # dejaría múltiples versiones marcadas "Production" a la vez (se
+        # comprobó corriendo el script dos veces seguidas), en vez de
+        # representar una única versión vigente en cada momento.
         client.transition_model_version_stage(
             name=REGISTERED_MODEL_NAME, version=mv.version, stage="Production",
+            archive_existing_versions=True,
         )
 
         print(

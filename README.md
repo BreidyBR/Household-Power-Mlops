@@ -414,6 +414,50 @@ y abrir `http://localhost:5000`. `mlflow.db` y `mlruns/` son artefactos locales 
 
 > Nota: al igual que en `src/validation/validate.py` (Día 4), MLflow >= 3.0 puso en modo mantenimiento el backend de tracking de solo archivos. El tracking store usa SQLite (`mlflow.db`) y los artefactos (modelos, gráficos) se mantienen en `mlruns/` local.
 
+## API de Inferencia y Testing
+
+La API de inferencia se encuentra implementada en:
+
+```text
+api/main.py
+```
+
+Sirve el modelo **ya registrado** en el Model Registry de MLflow (`household-power-forecaster`, Día 8) — no reentrena ni depende de un archivo local: carga directamente el modelo marcado como `Production` (o `Staging` si `Production` todavía no existe). Expone tres endpoints:
+
+- **`GET /health`** — estado del servicio y si el modelo cargó correctamente;
+- **`GET /model-info`** — nombre, versión y stage del modelo que está sirviendo en ese momento;
+- **`POST /predict`** — recibe las 20 features del modelo y devuelve `{"forecast": ..., "horizon": "24h", "model_version": "..."}`.
+
+Para levantarla localmente desde la raíz del proyecto:
+
+```powershell
+uvicorn api.main:app --reload --port 8000
+```
+
+Ejemplo de uso:
+
+```bash
+curl -X POST http://127.0.0.1:8000/predict -H "Content-Type: application/json" -d '{
+  "hour": 20, "day_of_week": 5, "month": 12, "is_weekend": 1,
+  "hour_sin": -1.0, "hour_cos": 0.0,
+  "lag_1h": 1.5, "lag_2h": 1.4, "lag_3h": 1.3, "lag_24h": 1.6, "lag_48h": 1.5, "lag_168h": 1.4,
+  "rollmean_3h": 1.4, "rollstd_3h": 0.1, "rollmean_6h": 1.3, "rollstd_6h": 0.2,
+  "rollmean_24h": 1.1, "rollstd_24h": 0.3, "rollmean_168h": 1.0, "rollstd_168h": 0.3
+}'
+```
+
+Las pruebas se encuentran en `tests/`:
+
+- **`test_data.py`** — esquema, tipos, rangos y ausencia de missing sobre `data/processed/features_hourly.parquet`;
+- **`test_model.py`** — carga el modelo real desde el Model Registry y verifica que un input válido produzca un pronóstico numérico y físicamente plausible, y que un input inválido (columna faltante, tipo incorrecto) genere un error, no un resultado silencioso;
+- **`test_api.py`** — usa `TestClient` de FastAPI para confirmar que una petición válida responde `200` con el schema esperado, y que peticiones inválidas (campo faltante, tipo incorrecto, cuerpo vacío) responden `422`.
+
+Para ejecutar todas las pruebas desde la raíz del proyecto:
+
+```powershell
+pytest tests/ -v
+```
+
 ## Estado del proyecto
 
 - [x] Repositorio Git creado
@@ -434,7 +478,8 @@ y abrir `http://localhost:5000`. `mlflow.db` y `mlruns/` son artefactos locales 
 - [x] MLflow Tracking
 - [x] Model Registry
 - [ ] Docker
-- [ ] Model API
+- [x] Model API
+- [x] Testing
 - [ ] Monitoring
 - [ ] Retraining Trigger
 

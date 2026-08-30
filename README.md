@@ -422,7 +422,7 @@ La API de inferencia se encuentra implementada en:
 api/main.py
 ```
 
-Sirve el modelo **ya registrado** en el Model Registry de MLflow (`household-power-forecaster`, Día 8) — no reentrena ni depende de un archivo local: carga directamente el modelo marcado como `Production` (o `Staging` si `Production` todavía no existe). Expone tres endpoints:
+La API sirve el modelo final seleccionado durante la etapa de entrenamiento y registrado en MLflow como `household-power-forecaster`. El mecanismo de carga depende del entorno de ejecución: durante el desarrollo local, la API obtiene el modelo marcado como `Production` en el Model Registry de MLflow; dentro del contenedor Docker, carga el artefacto `models/random_forest_model.joblib` empaquetado en la imagen mediante la variable de entorno `MODEL_PATH`. De esta manera, el contenedor puede ejecutarse de forma independiente del servidor local de MLflow, manteniendo el mismo modelo seleccionado para producción. Expone tres endpoints:
 
 - **`GET /health`** — estado del servicio y si el modelo cargó correctamente;
 - **`GET /model-info`** — nombre, versión y stage del modelo que está sirviendo en ese momento;
@@ -458,6 +458,47 @@ Para ejecutar todas las pruebas desde la raíz del proyecto:
 pytest tests/ -v
 ```
 
+## Docker
+
+La API y el modelo final se encuentran contenerizados mediante `Dockerfile`. La imagen utiliza `python:3.14-slim` como base e incluye únicamente los componentes necesarios para ejecutar el servicio de inferencia.
+
+Durante la construcción se incorpora el modelo final generado por `src/training/train.py`:
+
+```text
+models/random_forest_model.joblib
+```
+
+Dentro del contenedor, la variable de entorno `MODEL_PATH` apunta a este artefacto, permitiendo que la API cargue el modelo sin depender de la instancia local de MLflow.
+
+Antes de construir la imagen, el modelo debe haber sido generado ejecutando:
+
+```powershell
+python src/training/train.py
+```
+
+Para construir la imagen Docker desde la raíz del proyecto:
+
+```powershell
+docker build -t grupo7-mlops .
+```
+
+Para ejecutar el contenedor:
+
+```powershell
+docker run --rm -p 8000:8000 --name grupo7-mlops-api grupo7-mlops
+```
+
+La API queda disponible en:
+
+```text
+http://localhost:8000
+```
+
+La ejecución del contenedor fue validada mediante los endpoints `/health`, `/model-info` y `/predict`. El endpoint de predicción respondió correctamente con un pronóstico a 24 horas utilizando el modelo empaquetado en la imagen.
+
+El archivo `.dockerignore` evita incorporar al contexto de construcción datasets, notebooks, artefactos locales de MLflow, entornos virtuales y otros archivos que no son necesarios para la inferencia.
+
+
 ## Estado del proyecto
 
 - [x] Repositorio Git creado
@@ -477,7 +518,7 @@ pytest tests/ -v
 - [x] Evaluation
 - [x] MLflow Tracking
 - [x] Model Registry
-- [ ] Docker
+- [x] Docker
 - [x] Model API
 - [x] Testing
 - [ ] Monitoring

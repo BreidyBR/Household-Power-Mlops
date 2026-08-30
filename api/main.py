@@ -14,6 +14,9 @@ Endpoints:
 Uso local:
     uvicorn api.main:app --reload --port 8000
 """
+import os
+import joblib
+
 import sys
 from pathlib import Path
 
@@ -79,29 +82,57 @@ class PredictResponse(BaseModel):
 
 def load_production_model():
     """
-    Carga el modelo desde el Model Registry de MLflow (no desde un archivo
-    .joblib local): así la API siempre sirve exactamente el modelo que el
-    Registry marca como oficial, sin depender de una copia local que pueda
-    quedar desactualizada.
+    Carga el modelo desde una ruta local si MODEL_PATH está definida
+    (por ejemplo, dentro de Docker). Si no, utiliza el Model Registry
+    de MLflow como en el entorno local de desarrollo.
     """
 
     global _model, _model_version_info
+
+    model_path = os.getenv("MODEL_PATH")
+
+    if model_path:
+        _model = joblib.load(model_path)
+        _model_version_info = {
+            "version": os.getenv("MODEL_VERSION", "docker"),
+            "stage": "Production",
+            "run_id": "local-artifact",
+        }
+        print(f"Modelo cargado desde archivo local: {model_path}")
+        return
 
     mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
     client = mlflow.tracking.MlflowClient()
 
     for stage in MODEL_STAGES_TO_TRY:
-        versions = client.get_latest_versions(REGISTERED_MODEL_NAME, stages=[stage])
+        versions = client.get_latest_versions(
+            REGISTERED_MODEL_NAME,
+            stages=[stage],
+        )
+
         if versions:
             mv = versions[0]
-            _model = mlflow.sklearn.load_model(f"models:/{REGISTERED_MODEL_NAME}/{stage}")
-            _model_version_info = {"version": mv.version, "stage": stage, "run_id": mv.run_id}
-            print(f"Modelo cargado: {REGISTERED_MODEL_NAME} v{mv.version} (stage={stage})")
+            _model = mlflow.sklearn.load_model(
+                f"models:/{REGISTERED_MODEL_NAME}/{stage}"
+            )
+            _model_version_info = {
+                "version": mv.version,
+                "stage": stage,
+                "run_id": mv.run_id,
+            }
+
+            print(
+                f"Modelo cargado: "
+                f"{REGISTERED_MODEL_NAME} v{mv.version} "
+                f"(stage={stage})"
+            )
             return
 
     raise RuntimeError(
-        f"No hay ningún modelo registrado en stage {MODEL_STAGES_TO_TRY} para "
-        f"'{REGISTERED_MODEL_NAME}'. Corre src/training/train.py primero."
+        f"No hay ningún modelo registrado en stage "
+        f"{MODEL_STAGES_TO_TRY} para "
+        f"'{REGISTERED_MODEL_NAME}'. "
+        f"Corre src/training/train.py primero."
     )
 
 

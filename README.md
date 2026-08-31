@@ -500,6 +500,140 @@ Para reducir el tamaño de la imagen de producción, Docker utiliza `requirement
 
 El archivo `.dockerignore` evita incorporar al contexto de construcción datasets, notebooks, artefactos locales de MLflow, entornos virtuales y otros archivos que no son necesarios para la inferencia.
 
+## Monitoring
+
+El sistema incorpora monitoreo en producción en tres niveles: métricas operativas del servicio, drift de los datos y desempeño del modelo. Adicionalmente, se implementa monitoreo de calidad sobre los batches de producción para detectar entradas anómalas antes de utilizarlas.
+
+### System Monitoring
+
+El monitoreo operativo se encuentra implementado en:
+
+```text
+src/monitoring/system_monitor.py
+```
+
+La API registra automáticamente:
+
+- **latency**: tiempo promedio de respuesta en milisegundos;
+- **throughput**: solicitudes procesadas por segundo;
+- **error rate**: proporción de solicitudes que producen errores internos del servicio (5xx);
+- **availability**: proporción de solicitudes atendidas sin errores internos.
+
+Las métricas acumuladas pueden consultarse mediante:
+
+```text
+GET /metrics
+```
+
+El propio endpoint `/metrics` se excluye del conteo para evitar que la consulta de observabilidad altere las métricas que está midiendo.
+
+### Reference y Production Batches
+
+La construcción de los períodos utilizados para monitoring se encuentra en:
+
+```text
+src/monitoring/production_batches.py
+```
+
+Los datos se dividen respetando estrictamente el orden temporal. El 85 % histórico utilizado durante el desarrollo del modelo (train + validation) se utiliza como **REFERENCE**, mientras que el 15 % final, no utilizado para entrenar el modelo, representa producción y se divide cronológicamente en tres batches:
+
+- REFERENCE: 28,879 filas;
+- PRODUCTION_BATCH_1: 1,699 filas;
+- PRODUCTION_BATCH_2: 1,699 filas;
+- PRODUCTION_BATCH_3: 1,699 filas.
+
+La división puede reproducirse mediante:
+
+```powershell
+python -m src.monitoring.production_batches
+```
+
+### Data Drift
+
+La detección de cambios en la distribución de las features se implementa en:
+
+```text
+src/monitoring/drift_monitor.py
+```
+
+Se utiliza **Population Stability Index (PSI)** comparando cada batch de producción contra REFERENCE. Como criterio operativo del proyecto:
+
+- PSI < 0.10 → `OK`;
+- 0.10 ≤ PSI < 0.25 → `WARNING`;
+- PSI ≥ 0.25 → `ALERT`.
+
+Estos valores funcionan como umbrales operativos de monitoreo y no se interpretan como límites universales. Una alerta de drift indica un cambio en la distribución de los datos, pero no implica por sí sola degradación del modelo.
+
+Además de evaluar los batches naturales, el módulo incluye una simulación controlada de drift sobre una copia de `PRODUCTION_BATCH_3`, incrementando un 35 % algunas variables históricas de consumo. La simulación no modifica el dataset original.
+
+Para ejecutar el análisis:
+
+```powershell
+python -m src.monitoring.drift_monitor
+```
+
+### Model Monitoring
+
+El desempeño del modelo sobre los batches de producción se evalúa en:
+
+```text
+src/monitoring/model_monitor.py
+```
+
+Cuando el ground truth está disponible, se calculan **MAE_t** y **RMSE_t** para cada período:
+
+| Batch | MAE_t | RMSE_t |
+|---|---:|---:|
+| PRODUCTION_BATCH_1 | 0.4317 kW | 0.5820 kW |
+| PRODUCTION_BATCH_2 | 0.3968 kW | 0.5256 kW |
+| PRODUCTION_BATCH_3 | 0.4708 kW | 0.6571 kW |
+
+Esto permite distinguir entre un cambio en la distribución de los datos y una degradación real del desempeño predictivo.
+
+Para reproducir la evaluación:
+
+```powershell
+python -m src.monitoring.model_monitor
+```
+
+### Production Data Quality Monitoring
+
+La validación de calidad de los batches de producción se encuentra en:
+
+```text
+src/monitoring/quality_monitor.py
+```
+
+Para comprobar el comportamiento del sistema ante datos problemáticos se genera una copia de `PRODUCTION_BATCH_3` y se introducen de forma controlada:
+
+- un valor faltante;
+- una fila duplicada;
+- un outlier extremo;
+- un datatype incorrecto;
+- una modificación del esquema mediante una columna inesperada.
+
+El dataset original no se modifica durante esta simulación.
+
+El monitor aplica el flujo:
+
+```text
+Detect → Block / Warn → Log
+```
+
+Los problemas incompatibles con una inferencia segura, como schema incorrecto, missing values o tipos incompatibles, producen `FAIL → BLOCK`. Los duplicados y valores extremos generan `WARNING → WARN`, ya que requieren revisión pero no necesariamente representan datos inválidos.
+
+La evidencia de cada ejecución se registra en:
+
+```text
+reports/monitoring/quality_report.json
+```
+
+Para ejecutar la simulación y validación:
+
+```powershell
+python -m src.monitoring.quality_monitor
+```
+
 
 ## Estado del proyecto
 
@@ -523,7 +657,7 @@ El archivo `.dockerignore` evita incorporar al contexto de construcción dataset
 - [x] Docker
 - [x] Model API
 - [x] Testing
-- [ ] Monitoring
+- [x] Monitoring
 - [ ] Retraining Trigger
 
 ## Proyecto desarrollado por el **Grupo 7**.

@@ -1,0 +1,36 @@
+{
+  "timestamp_utc": "2026-08-31T17:53:36.557511+00:00",
+  "overall_action": "BLOCK",
+  "results": [
+    {
+      "check": "schema",
+      "status": "FAIL",
+      "action": "BLOCK",
+      "detail": "Columnas faltantes: []; columnas inesperadas: ['unexpected_column']"
+    },
+    {
+      "check": "missing_values",
+      "status": "FAIL",
+      "action": "BLOCK",
+      "detail": "Valores faltantes detectados: {'lag_24h': 1}"
+    },
+    {
+      "check": "duplicates",
+      "status": "WARNING",
+      "action": "WARN",
+      "detail": "Filas duplicadas: 1; timestamps duplicados: 1"
+    },
+    {
+      "check": "data_types",
+      "status": "FAIL",
+      "action": "BLOCK",
+      "detail": "Tipos incompatibles: {'rollmean_24h': {'expected': 'float64', 'received': 'object'}}"
+    },
+    {
+      "check": "extreme_outliers",
+      "status": "WARNING",
+      "action": "WARN",
+      "detail": "Valores extremos detectados con límites de 5*IQR: {'lag_168h': 1}"
+    }
+  ]
+}

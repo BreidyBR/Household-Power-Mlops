@@ -8,6 +8,7 @@ externo.
 
 Endpoints:
     GET  /health       — estado del servicio y si el modelo cargó correctamente
+    GET  /metrics       — métricas operativas del servicio
     GET  /model-info    — qué modelo/versión/stage está sirviendo ahora mismo
     POST /predict       — recibe las 20 features y devuelve el pronóstico a 24h
 
@@ -15,12 +16,15 @@ Uso local:
     uvicorn api.main:app --reload --port 8000
 """
 import os
+import time
 import joblib
 
 
 import pandas as pd
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel
+
+from src.monitoring.system_monitor import SystemMonitor
 
 REGISTERED_MODEL_NAME = "household-power-forecaster"
 MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "sqlite:///mlflow.db")
@@ -30,6 +34,8 @@ app = FastAPI(
     description="Pronostica Global_active_power (kW) a 24 horas vista.",
     version="1.0.0",
 )
+
+system_monitor = SystemMonitor()
 
 # Etapa desde la que se sirve el modelo. Se intenta primero Production
 # (la promoción final del Día 8); si no existe, se cae a Staging, para que
@@ -152,6 +158,38 @@ def health():
         "model_loaded": _model is not None,
     }
 
+@app.middleware("http")
+async def monitor_requests(request: Request, call_next):
+    """Mide latencia y resultado de cada solicitud atendida por la API."""
+
+    start_time = time.perf_counter()
+
+    try:
+        response = await call_next(request)
+    except Exception:
+        latency = time.perf_counter() - start_time
+
+        if request.url.path != "/metrics":
+            system_monitor.record_request(
+                latency_seconds=latency,
+                status_code=500,
+            )
+        raise
+
+    latency = time.perf_counter() - start_time
+
+    if request.url.path != "/metrics":
+        system_monitor.record_request(
+            latency_seconds=latency,
+            status_code=response.status_code,
+        )
+
+    return response
+
+@app.get("/metrics")
+def metrics():
+    """Expone las métricas operativas acumuladas del servicio."""
+    return system_monitor.get_metrics()
 
 @app.get("/model-info")
 def model_info():

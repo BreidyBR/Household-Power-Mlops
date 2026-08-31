@@ -17,17 +17,13 @@ Uso local:
 import os
 import joblib
 
-import sys
-from pathlib import Path
 
-import mlflow
-import mlflow.sklearn
 import pandas as pd
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
-sys.path.append(str(Path(__file__).resolve().parents[1]))  # api/main.py -> raíz del proyecto
-from src.training.train import MLFLOW_TRACKING_URI, REGISTERED_MODEL_NAME  # noqa: E402
+REGISTERED_MODEL_NAME = "household-power-forecaster"
+MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "sqlite:///mlflow.db")
 
 app = FastAPI(
     title="Household Power Forecasting API",
@@ -100,6 +96,9 @@ def load_production_model():
         }
         print(f"Modelo cargado desde archivo local: {model_path}")
         return
+
+    import mlflow
+    import mlflow.sklearn
 
     mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
     client = mlflow.tracking.MlflowClient()

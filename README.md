@@ -460,7 +460,7 @@ pytest tests/ -v
 
 ## Docker
 
-La API y el modelo final se encuentran contenerizados mediante `Dockerfile`. La imagen utiliza `python:3.14-slim` como base e incluye únicamente los componentes necesarios para ejecutar el servicio de inferencia.
+La API y el modelo final se encuentran contenerizados mediante `Dockerfile`. La imagen utiliza `python:3.14-slim` como base y un archivo de dependencias específico para producción, `requirements-api.txt`, que contiene únicamente las librerías necesarias para ejecutar el servicio de inferencia.
 
 Durante la construcción se incorpora el modelo final generado por `src/training/train.py`:
 
@@ -468,7 +468,7 @@ Durante la construcción se incorpora el modelo final generado por `src/training
 models/random_forest_model.joblib
 ```
 
-Dentro del contenedor, la variable de entorno `MODEL_PATH` apunta a este artefacto, permitiendo que la API cargue el modelo sin depender de la instancia local de MLflow.
+Dentro del contenedor, la variable de entorno `MODEL_PATH` apunta a este artefacto, permitiendo que la API cargue el modelo mediante `joblib` sin depender de MLflow durante la inferencia. En el entorno local se mantiene la integración con MLflow Model Registry para cargar el modelo registrado en `Production`.
 
 Antes de construir la imagen, el modelo debe haber sido generado ejecutando:
 
@@ -495,6 +495,8 @@ http://localhost:8000
 ```
 
 La ejecución del contenedor fue validada mediante los endpoints `/health`, `/model-info` y `/predict`. El endpoint de predicción respondió correctamente con un pronóstico a 24 horas utilizando el modelo empaquetado en la imagen.
+
+Para reducir el tamaño de la imagen de producción, Docker utiliza `requirements-api.txt` en lugar del archivo general `requirements.txt`. Esto evita instalar dependencias utilizadas únicamente durante análisis, entrenamiento y experimentación. Con esta separación, la imagen pasó de aproximadamente 1.37 GB a 707 MB, manteniendo el mismo comportamiento de la API y del modelo.
 
 El archivo `.dockerignore` evita incorporar al contexto de construcción datasets, notebooks, artefactos locales de MLflow, entornos virtuales y otros archivos que no son necesarios para la inferencia.
 

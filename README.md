@@ -730,4 +730,13 @@ El archivo `render.yaml` (Blueprint de Render) define ambos servicios — la API
 - [x] Monitoring
 - [x] Retraining Trigger
 
-## Proyecto desarrollado por el **Grupo 7**.
+## Equipo
+
+Proyecto desarrollado por el **Grupo 7**.
+
+| Integrante | GitHub |
+|---|---|
+| Breidy Bonilla | [@BreidyBR](https://github.com/BreidyBR) |
+| Oscar Eduardo Sánchez Barahona | [@oscar2903](https://github.com/oscar2903) |
+
+Ambos integrantes participaron a lo largo de todas las etapas del proyecto (ingesta, calidad de datos, EDA, feature engineering, modelado, MLflow, API, Docker, monitoreo y despliegue), trabajando mediante ramas independientes y Pull Requests revisados antes de fusionarse a `develop`, y de `develop` a `main` una vez verificado el proyecto completo.

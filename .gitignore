@@ -1,0 +1,91 @@
+# ==============================
+# Python
+# ==============================
+__pycache__/
+*.py[cod]
+*$py.class
+
+# ==============================
+# Virtual environments
+# ==============================
+.venv/
+venv/
+env/
+
+# ==============================
+# Environment variables / secrets
+# ==============================
+.env
+.env.*
+!.env.example
+
+# ==============================
+# Jupyter
+# ==============================
+.ipynb_checkpoints/
+
+# ==============================
+# IDE / Editor
+# ==============================
+.vscode/
+.idea/
+
+# ==============================
+# Operating system
+# ==============================
+.DS_Store
+Thumbs.db
+
+# ==============================
+# Raw and generated data
+# ==============================
+data/raw/*
+data/interim/*
+data/processed/*
+
+# Keep directory structure in Git
+!data/raw/.gitkeep
+!data/interim/.gitkeep
+!data/processed/.gitkeep
+
+# ==============================
+# MLflow local artifacts
+# ==============================
+mlruns/
+mlartifacts/
+mlflow.db
+mlflow.db-*
+
+# ==============================
+# Model artifacts
+# ==============================
+*.pkl
+*.joblib
+*.pickle
+
+# Excepcion: el modelo final seleccionado y registrado como Production
+# (Dia 8) SI se versiona -- lo necesita el Dockerfile (COPY
+# models/random_forest_model.joblib) para construir una imagen reproducible
+# sin depender de que quien clone el repo corra todo el pipeline de
+# entrenamiento primero.
+!models/random_forest_model.joblib
+
+# ==============================
+# Logs
+# ==============================
+*.log
+logs/
+
+# ==============================
+# Testing / coverage
+# ==============================
+.pytest_cache/
+.coverage
+htmlcov/
+
+# ==============================
+# Temporary files
+# ==============================
+*.tmp
+*.temp
+~$*

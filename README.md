@@ -103,17 +103,15 @@ Data Drift   Model    System
 ```text
 Household-Power-Mlops/
 │
-├── api/
-├── configs/
+├── api/                    # API de inferencia (FastAPI)
+├── ui/                     # Interfaz Streamlit
 ├── data/
 │   ├── raw/
 │   ├── interim/
-│   ├── processed/
-│   └── production/
-|── models/
+│   └── processed/
+├── models/                 # Modelo final versionado (random_forest_model.joblib)
 ├── notebooks/
 ├── reports/
-│   ├── figures/
 │   ├── data_quality/
 │   └── monitoring/
 ├── src/
@@ -122,15 +120,18 @@ Household-Power-Mlops/
 │   ├── cleaning/
 │   ├── features/
 │   ├── training/
-│   ├── evaluation/
-│   ├── monitoring/
-│   └── utils/
+│   └── monitoring/
 ├── tests/
 ├── .gitignore
+├── Dockerfile
 ├── README.md
 ├── requirements.txt
-└── requirements-dev.txt
+├── requirements-dev.txt
+├── requirements-api.txt
+└── requirements-ui.txt
 ```
+
+> Nota: `configs/`, `data/production/`, `src/evaluation/` y `src/utils/` existieron como carpetas vacías desde la estructura inicial del proyecto, pero nunca se usaron — cada script del pipeline define sus propias constantes y rutas de forma independiente (ver, por ejemplo, `src/training/train.py` o `src/monitoring/production_batches.py`, que hace la división reference/producción en memoria sin escribir a `data/production/`). Se eliminaron para que la estructura del repositorio refleje únicamente lo que realmente existe y se usa.
 
 ## Tecnologías
 

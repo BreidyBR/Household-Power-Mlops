@@ -42,13 +42,11 @@ Thumbs.db
 data/raw/*
 data/interim/*
 data/processed/*
-data/production/*
 
 # Keep directory structure in Git
 !data/raw/.gitkeep
 !data/interim/.gitkeep
 !data/processed/.gitkeep
-!data/production/.gitkeep
 
 # ==============================
 # MLflow local artifacts

@@ -1,0 +1,40 @@
+# Blueprint de Render (https://render.com/docs/blueprint-spec).
+#
+# Define los dos servicios necesarios para la demo publica del proyecto:
+#
+#   1. household-power-api: la API de FastAPI (api/main.py), construida a
+#      partir del Dockerfile ya existente y verificado (Dia 10). Sirve el
+#      modelo Random Forest regularizado empaquetado en la imagen.
+#   2. household-power-ui: la interfaz Streamlit (ui/app.py), que consume
+#      la API anterior.
+#
+# Uso: en render.com -> New + -> Blueprint -> conectar este repositorio ->
+# Render detecta este archivo automaticamente y crea ambos servicios.
+#
+# La variable API_URL de la UI queda marcada como "sync: false" a
+# proposito: su valor depende de la URL publica que Render le asigne al
+# servicio de la API, que no se conoce hasta despues del primer deploy.
+# Se completa manualmente una sola vez desde el dashboard (ver README).
+
+services:
+  - type: web
+    name: household-power-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: MODEL_PATH
+        value: /app/models/random_forest_model.joblib
+      - key: MODEL_VERSION
+        value: "3"
+
+  - type: web
+    name: household-power-ui
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements-ui.txt
+    startCommand: streamlit run ui/app.py --server.port $PORT --server.address 0.0.0.0
+    envVars:
+      - key: API_URL
+        sync: false

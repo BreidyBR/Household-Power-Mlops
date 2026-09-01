@@ -634,6 +634,75 @@ Para ejecutar la simulación y validación:
 python -m src.monitoring.quality_monitor
 ```
 
+### Retraining Trigger
+
+La estrategia de reentrenamiento se encuentra implementada en:
+
+```text
+src/monitoring/retraining_trigger.py
+```
+
+La decisión de recomendar un reentrenamiento combina **dos señales**, no una sola:
+
+```text
+significant_drift  AND  performance_degradation  ->  RETRAIN
+```
+
+Un cambio en la distribución de los datos (drift) no implica por sí solo que el modelo haya dejado de funcionar correctamente — por eso el drift nunca dispara el reentrenamiento en solitario. La degradación de desempeño se calcula comparando `MAE_t`/`RMSE_t` (de `model_monitor.py`) contra el desempeño de referencia del modelo en test, permitiendo hasta un 20 % de tolerancia antes de considerarlo degradado.
+
+Ejemplo real con `PRODUCTION_BATCH_3` (drift significativo detectado, pero desempeño estable):
+
+```text
+Drift significativo:       True
+MAE actual:                0.4708 (threshold: 0.5197)
+RETRAIN:                   False
+Razón: Existe drift significativo, pero el desempeño del modelo
+permanece dentro de los límites aceptables. No se reentrena.
+```
+
+Para ejecutar el caso de prueba:
+
+```powershell
+python -m src.monitoring.retraining_trigger
+```
+
+## Interfaz y Despliegue
+
+Como complemento al proyecto (no forma parte de los entregables obligatorios del enunciado), se construyó una interfaz visual y su despliegue público, para facilitar la demo.
+
+### Interfaz Streamlit
+
+```text
+ui/app.py
+```
+
+Consume la API mediante peticiones HTTP (`GET /health`, `GET /model-info`, `POST /predict`) — no importa el modelo directamente. Muestra el estado de la API y del modelo cargado, y un formulario para generar un pronóstico a 24 horas sin necesidad de construir el JSON manualmente.
+
+Para ejecutarla localmente (requiere la API corriendo en paralelo):
+
+```powershell
+# Terminal 1
+uvicorn api.main:app --reload --port 8000
+
+# Terminal 2
+pip install -r requirements-ui.txt
+streamlit run ui/app.py
+```
+
+Por defecto apunta a `http://127.0.0.1:8000`; se puede sobreescribir con la variable de entorno `API_URL`.
+
+### Despliegue en Render
+
+El archivo `render.yaml` (Blueprint de Render) define ambos servicios — la API (Docker, reutilizando el `Dockerfile` ya validado) y la interfaz Streamlit — para desplegarlos con un solo Blueprint:
+
+1. Crear una cuenta en [render.com](https://render.com) (tiene plan gratuito) y conectarla a GitHub.
+2. **New +** → **Blueprint** → seleccionar este repositorio → Render detecta `render.yaml` automáticamente y muestra los dos servicios.
+3. Aplicar el Blueprint. El primer deploy de la API tarda unos minutos (construye la imagen Docker).
+4. Una vez que `household-power-api` esté desplegado, copiar su URL pública (ej. `https://household-power-api-xxxx.onrender.com`).
+5. Ir al servicio `household-power-ui` → pestaña **Environment** → completar la variable `API_URL` con esa URL (con `https://`) → guardar (esto redeploya la UI automáticamente).
+6. Abrir la URL pública de `household-power-ui` — debería funcionar igual que en local.
+
+> El plan gratuito de Render "duerme" un servicio tras un período de inactividad; la primera solicitud después de eso puede tardar 30-60 segundos en responder mientras el servicio despierta. Se recomienda abrir el link unos minutos antes de la demo.
 
 ## Estado del proyecto
 
@@ -658,6 +727,6 @@ python -m src.monitoring.quality_monitor
 - [x] Model API
 - [x] Testing
 - [x] Monitoring
-- [ ] Retraining Trigger
+- [x] Retraining Trigger
 
 ## Proyecto desarrollado por el **Grupo 7**.

@@ -65,6 +65,13 @@ mlflow.db-*
 *.joblib
 *.pickle
 
+# Excepcion: el modelo final seleccionado y registrado como Production
+# (Dia 8) SI se versiona -- lo necesita el Dockerfile (COPY
+# models/random_forest_model.joblib) para construir una imagen reproducible
+# sin depender de que quien clone el repo corra todo el pipeline de
+# entrenamiento primero.
+!models/random_forest_model.joblib
+
 # ==============================
 # Logs
 # ==============================

@@ -411,7 +411,7 @@ Para explorar los resultados en el navegador:
 mlflow ui --backend-store-uri sqlite:///mlflow.db --default-artifact-root file:./mlruns
 ```
 
-y abrir `http://localhost:5000`. `mlflow.db` y `mlruns/` son artefactos locales regenerables (como `data/raw/` o `models/`) y no se versionan en Git; cada integrante del equipo genera los suyos corriendo los scripts anteriores.
+y abrir `http://localhost:5000`. `mlflow.db` y `mlruns/` son artefactos locales regenerables y no se versionan en Git; cada integrante del equipo genera los suyos ejecutando los scripts anteriores. El modelo final `models/random_forest_model.joblib`, en cambio, se mantiene versionado en el repositorio para permitir la construcción reproducible de la imagen Docker.
 
 > Nota: al igual que en `src/validation/validate.py` (Día 4), MLflow >= 3.0 puso en modo mantenimiento el backend de tracking de solo archivos. El tracking store usa SQLite (`mlflow.db`) y los artefactos (modelos, gráficos) se mantienen en `mlruns/` local.
 
@@ -666,6 +666,16 @@ Para ejecutar el caso de prueba:
 ```powershell
 python -m src.monitoring.retraining_trigger
 ```
+
+> **Nota sobre artefactos regenerables:** algunos scripts del pipeline vuelven a generar archivos que se mantienen versionados como evidencia o artefactos del proyecto. Por ejemplo, `src/training/train.py` actualiza `models/random_forest_model.joblib` y `src/monitoring/quality_monitor.py` actualiza `reports/monitoring/quality_report.json`. Por esta razón, después de ejecutar estos procesos Git puede mostrar dichos archivos como modificados. Este comportamiento es esperado y no indica un error en la ejecución.
+>
+> Si los comandos se ejecutaron únicamente para comprobar la reproducibilidad del proyecto y no se desea conservar los artefactos regenerados, pueden restaurarse a la versión registrada en Git mediante:
+>
+> ```powershell
+> git restore models/random_forest_model.joblib reports/monitoring/quality_report.json
+> ```
+>
+> Este paso es opcional y no forma parte del pipeline MLOps; únicamente permite devolver el repositorio a un estado limpio después de realizar pruebas locales.
 
 ## Interfaz y Despliegue
 

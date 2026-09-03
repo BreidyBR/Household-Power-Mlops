@@ -471,6 +471,8 @@ models/random_forest_model.joblib
 
 Dentro del contenedor, la variable de entorno `MODEL_PATH` apunta a este artefacto, permitiendo que la API cargue el modelo mediante `joblib` sin depender de MLflow durante la inferencia. En el entorno local se mantiene la integración con MLflow Model Registry para cargar el modelo registrado en `Production`.
 
+> **Nota — el modelo final sí está versionado en Git.** La regla general del proyecto (`*.joblib` en `.gitignore`) excluye los artefactos de modelo, ya que normalmente son regenerables corriendo el pipeline de entrenamiento. `models/random_forest_model.joblib` es una excepción explícita a esa regla (`!models/random_forest_model.joblib`), porque el `Dockerfile` lo necesita empaquetado dentro de la imagen para poder construirse — sin él, `docker build` fallaría para cualquier persona que clone el repositorio y no haya corrido antes `train.py` localmente. Esto se detectó como un bug real durante el desarrollo (el archivo quedaba bloqueado por la regla general y nunca llegaba a subirse a GitHub) y se corrigió agregando la excepción y versionando el archivo (~24 MB), verificado luego con un clon limpio del repositorio y un ciclo completo de `build`/`run`/`predict`.
+
 Antes de construir la imagen, el modelo debe haber sido generado ejecutando:
 
 ```powershell
